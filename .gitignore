@@ -1,0 +1,17 @@
+node_modules
+.env
+coverage
+coverage.json
+typechain
+hardhat.config.js
+
+cache
+testcontracts.txt
+todo
+scripts
+config
+#Hardhat files
+cache
+artifacts
+
+.DS_Store
