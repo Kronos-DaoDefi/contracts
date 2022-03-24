@@ -679,6 +679,11 @@
   dependencies:
     "@types/bignumber.js" "^5.0.0"
 
+"@openzeppelin/contracts@^4.5.0":
+  "integrity" "sha512-fdkzKPYMjrRiPK6K4y64e6GzULR7R7RwxSigHS8DDp7aWDeoReqsQI+cxHV1UuhAqX69L1lAaWDxenfP+xiqzA=="
+  "resolved" "https://registry.npmjs.org/@openzeppelin/contracts/-/contracts-4.5.0.tgz"
+  "version" "4.5.0"
+
 "@poanet/solidity-flattener@^3.0.6":
   "integrity" "sha512-BCeBZ6DRNfvPWUapRfhVua8zGeeMA1saYceQJDa2izPqTUfJMMaQHNrnyQ3tqgy+0nSeyRwYaSoEsRkQGa+new=="
   "resolved" "https://registry.npmjs.org/@poanet/solidity-flattener/-/solidity-flattener-3.0.6.tgz"

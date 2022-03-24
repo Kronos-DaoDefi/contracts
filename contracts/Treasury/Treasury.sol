@@ -1,5 +1,4 @@
 
-
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity 0.7.5;
 
@@ -225,6 +224,9 @@ interface IERC20Mintable {
   function mint( address account_, uint256 ammount_ ) external;
 }
 
+interface IOHMERC20 {
+    function burnFrom(address account_, uint256 amount_) external;
+}
 
 interface IBondCalculator {
   function valuation( address pair_, uint amount_ ) external view returns ( uint _value );
@@ -263,7 +265,6 @@ contract KronosTreasury is Ownable {
     address public immutable Kronos;
     uint32 public immutable secondsNeededForQueue;
 
-    address public constant DEAD_ADDRESS = 0x000000000000000000000000000000000000dEaD;
     address[] public reserveTokens; // Push only, beware false-positives.
     mapping( address => bool ) public isReserveToken;
     mapping( address => uint32 ) public reserveTokenQueue; // Delays changes to mapping.
@@ -303,7 +304,7 @@ contract KronosTreasury is Ownable {
     mapping( address => bool ) public isRewardManager;
     mapping( address => uint32 ) public rewardManagerQueue; // Delays changes to mapping.
 
-    address public MEMOries;
+    address public sKronos;
     uint public sOHMQueue; // Delays change to sOHM address
     
     uint public totalReserves; // Risk-free value of all assets
@@ -312,12 +313,18 @@ contract KronosTreasury is Ownable {
     constructor (
         address _Kronos,
         address _BUSD,
+        address _sKronos,
         uint32 _secondsNeededForQueue
     ) {
         require( _Kronos != address(0) );
         Kronos = _Kronos;
+
         isReserveToken[ _BUSD ] = true;
         reserveTokens.push( _BUSD );
+
+        sKronos = _sKronos;
+    //    isLiquidityToken[ _OHMDAI ] = true;
+    //    liquidityTokens.push( _OHMDAI );
 
         secondsNeededForQueue = _secondsNeededForQueue;
     }
@@ -360,8 +367,7 @@ contract KronosTreasury is Ownable {
         require( isReserveSpender[ msg.sender ] == true, "Not approved" );
 
         uint value = valueOf( _token, _amount );
-        IERC20( Kronos ).safeTransferFrom( msg.sender,address(this), value );
-        IERC20( Kronos ).safeTransfer(DEAD_ADDRESS, value );
+        IOHMERC20( Kronos ).burnFrom( msg.sender, value );
 
         totalReserves = totalReserves.sub( value );
         emit ReservesUpdated( totalReserves );
@@ -382,7 +388,7 @@ contract KronosTreasury is Ownable {
 
         uint value = valueOf( _token, _amount );
 
-        uint maximumDebt = IERC20( MEMOries ).balanceOf( msg.sender ); // Can only borrow against sOHM held
+        uint maximumDebt = IERC20( sKronos ).balanceOf( msg.sender ); // Can only borrow against sOHM held
         uint availableDebt = maximumDebt.sub( debtorBalance[ msg.sender ] );
         require( value <= availableDebt, "Exceeds debt limit" );
 
@@ -425,10 +431,8 @@ contract KronosTreasury is Ownable {
     function repayDebtWithOHM( uint _amount ) external {
         require( isDebtor[ msg.sender ], "Not approved" );
 
-    
+        IOHMERC20( Kronos ).burnFrom( msg.sender, _amount );
 
-        IERC20( Kronos ).safeTransferFrom( msg.sender,address(this), _amount );
-        IERC20( Kronos ).safeTransfer(DEAD_ADDRESS, _amount );
         debtorBalance[ msg.sender ] = debtorBalance[ msg.sender ].sub( _amount );
         totalDebt = totalDebt.sub( _amount );
 
@@ -463,7 +467,6 @@ contract KronosTreasury is Ownable {
      */
     function mintRewards( address _recipient, uint _amount ) external {
         require( isRewardManager[ msg.sender ], "Not approved" );
-        require( _amount <= excessReserves(), "Insufficient reserves" );
 
         IERC20Mintable( Kronos ).mint( _recipient, _amount );
 
@@ -657,7 +660,7 @@ contract KronosTreasury is Ownable {
 
         } else if ( _managing == MANAGING.SOHM ) { // 9
             sOHMQueue = 0;
-            MEMOries = _address;
+            sKronos = _address;
             result = true;
 
         } else return false;

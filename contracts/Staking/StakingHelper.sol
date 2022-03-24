@@ -93,7 +93,7 @@ contract StakingHelper {
         Kronos = _Kronos;
     }
 
-    function stake( uint _amount, address recipient ) external {
+    function stake( uint256 _amount, address recipient ) external {
         IERC20( Kronos ).transferFrom( msg.sender, address(this), _amount );
         IERC20( Kronos ).approve( staking, _amount );
         IStaking( staking ).stake( _amount, recipient );

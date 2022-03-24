@@ -1144,9 +1144,9 @@ contract KronosDaoToken is ERC20Permit, VaultOwned {
     IPinkAntiBot public  pinkAntiBot;
     bool public antiBotEnabled;
 
-    constructor(address _pinkAntiBot) ERC20("KronosDao", "KRONOS", 9) {
-        pinkAntiBot = IPinkAntiBot(_pinkAntiBot);
-        pinkAntiBot.setTokenOwner(msg.sender);
+    constructor() ERC20("KronosDao", "KRONOS", 9) {
+        // pinkAntiBot = IPinkAntiBot(_pinkAntiBot);
+        // pinkAntiBot.setTokenOwner(msg.sender);
     }
 
     function mint(address account_, uint256 amount_) external onlyVault {

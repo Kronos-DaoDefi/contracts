@@ -564,13 +564,15 @@ interface IsKronos {
     function index() external view returns ( uint );
 }
 
-interface IWarmup {
-    function retrieve( address staker_, uint amount_ ) external;
-}
 
 interface IDistributor {
     function distribute() external returns ( bool );
 }
+
+interface IDiamondHand {
+     function deposit(address _to, uint256 amount) external;
+}
+
 
 contract KronosStaking is Ownable {
 
@@ -580,6 +582,7 @@ contract KronosStaking is Ownable {
 
     address public immutable Kronos;
     address public immutable sKronos;
+    address public  diamondHand;
 
     struct Epoch {
         uint number;
@@ -594,8 +597,6 @@ contract KronosStaking is Ownable {
     address public locker;
     uint public totalBonus;
     
-    address public warmupContract;
-    uint public warmupPeriod;
     
     constructor ( 
         address _Kronos, 
@@ -623,73 +624,53 @@ contract KronosStaking is Ownable {
         uint expiry;
         bool lock; // prevents malicious delays
     }
-    mapping( address => Claim ) public warmupInfo;
 
-    /**
-        @notice stake OHM to enter warmup
-        @param _amount uint
-        @return bool
-     */
-    function stake( uint _amount, address _recipient ) external returns ( bool ) {
+   
+    function stake( uint _amount) external returns ( bool ) {
         rebase();
         
         IERC20( Kronos ).safeTransferFrom( msg.sender, address(this), _amount );
+        IERC20( sKronos ).safeTransfer( msg.sender, _amount );
 
-        Claim memory info = warmupInfo[ _recipient ];
-        require( !info.lock, "Deposits for account are locked" );
-
-        warmupInfo[ _recipient ] = Claim ({
-            deposit: info.deposit.add( _amount ),
-            gons: info.gons.add( IsKronos( sKronos ).gonsForBalance( _amount ) ),
-            expiry: epoch.number.add( warmupPeriod ),
-            lock: false
-        });
-        
-        IERC20( sKronos ).safeTransfer( warmupContract, _amount );
         return true;
     }
 
-    /**
-        @notice retrieve sOHM from warmup
-        @param _recipient address
-     */
-    function claim ( address _recipient ) public {
-        Claim memory info = warmupInfo[ _recipient ];
-        if ( epoch.number >= info.expiry && info.expiry != 0 ) {
-            delete warmupInfo[ _recipient ];
-            IWarmup( warmupContract ).retrieve( _recipient, IsKronos( sKronos ).balanceForGons( info.gons ) );
-        }
+ 
+
+
+   
+    function stake( uint _amount, address receiver) external returns ( bool ) {
+        rebase();
+        
+        IERC20(Kronos).safeTransferFrom( msg.sender, address(this), _amount );
+        IERC20(sKronos).safeTransfer(receiver, _amount );
+
+        return true;
     }
 
-    /**
-        @notice forfeit sOHM in warmup and retrieve OHM
-     */
-    function forfeit() external {
-        Claim memory info = warmupInfo[ msg.sender ];
-        delete warmupInfo[ msg.sender ];
+    
 
-        IWarmup( warmupContract ).retrieve( address(this), IsKronos( sKronos ).balanceForGons( info.gons ) );
-        IERC20( Kronos ).safeTransfer( msg.sender, info.deposit );
-    }
+  
 
-    /**
-        @notice prevent new deposits to address (protection from malicious activity)
-     */
-    function toggleDepositLock() external {
-        warmupInfo[ msg.sender ].lock = !warmupInfo[ msg.sender ].lock;
-    }
 
     /**
         @notice redeem sOHM for OHM
         @param _amount uint
         @param _trigger bool
      */
-    function unstake( uint _amount, bool _trigger ) external {
+    function unstake( uint _amount, bool _trigger, bool forDiamondHand ) external {
+        require(_amount>0,"invalid amount");
         if ( _trigger ) {
             rebase();
         }
         IERC20( sKronos ).safeTransferFrom( msg.sender, address(this), _amount );
-        IERC20( Kronos ).safeTransfer( msg.sender, _amount );
+        if(forDiamondHand && diamondHand != address(0)){
+            IERC20( Kronos ).safeApprove(diamondHand, _amount);
+            IDiamondHand(diamondHand).deposit(msg.sender, _amount);
+        }else{
+             IERC20( Kronos ).safeTransfer( msg.sender, _amount );
+        }
+      
     }
 
     /**
@@ -754,7 +735,7 @@ contract KronosStaking is Ownable {
         IERC20( sKronos ).safeTransferFrom( locker, address(this), _amount );
     }
 
-    enum CONTRACTS { DISTRIBUTOR, WARMUP, LOCKER }
+    enum CONTRACTS { DISTRIBUTOR, LOCKER, DIAMOND_HAND }
 
     /**
         @notice sets the contract address for LP staking
@@ -763,20 +744,15 @@ contract KronosStaking is Ownable {
     function setContract( CONTRACTS _contract, address _address ) external onlyManager() {
         if( _contract == CONTRACTS.DISTRIBUTOR ) { // 0
             distributor = _address;
-        } else if ( _contract == CONTRACTS.WARMUP ) { // 1
-            require( warmupContract == address( 0 ), "Warmup cannot be set more than once" );
-            warmupContract = _address;
-        } else if ( _contract == CONTRACTS.LOCKER ) { // 2
+        }  else if ( _contract == CONTRACTS.LOCKER ) { // 1
             require( locker == address(0), "Locker cannot be set more than once" );
             locker = _address;
         }
+        else if ( _contract == CONTRACTS.DIAMOND_HAND ) { // 2
+            diamondHand = _address;
+        }
+        
     }
     
-    /**
-     * @notice set warmup period in epoch's numbers for new stakers
-     * @param _warmupPeriod uint
-     */
-    function setWarmup( uint _warmupPeriod ) external onlyManager() {
-        warmupPeriod = _warmupPeriod;
-    }
+    
 }
